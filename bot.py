@@ -55,13 +55,13 @@ def make_image(member, mode="welcome"):
         fill="#cccccc"
     )
 
-    filename = "welcome.png" if mode == "welcome" else "leave.png"
+    filename = "welcome.jpg" if mode == "welcome" else "leave.jpg"
     bg.save(filename)
     return filename
 
 @bot.event
 async def on_member_join(member):
-    channel = discord.utils.get(member.guild.text_channels, name=CHANNEL_NAME)
+    channel = discord.utils.get(member.guild.text_channels, name=welcome)
     if channel is None:
         return
 
@@ -94,5 +94,6 @@ async def on_member_remove(member):
     await channel.send(embed=embed, file=discord.File(image))
 
 bot.run("DISCORD_TOKEN")
+
 
 
