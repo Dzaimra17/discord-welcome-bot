@@ -71,6 +71,11 @@ async def on_member_remove(member):
         color=discord.Color.red()
     )
 
+    embed.set_thumbnail(
+        url=member.avatar.url if member.avatar else member.default_avatar.url
+    )
+
     await welcome_channel.send(embed=embed)
 
 bot.run(os.getenv("TOKEN"))
+
