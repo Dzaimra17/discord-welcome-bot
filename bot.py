@@ -1,99 +1,76 @@
 import discord
 from discord.ext import commands
-from PIL import Image, ImageDraw, ImageFont
-import requests
-from io import BytesIO
+import os
 
 intents = discord.Intents.default()
 intents.members = True
+
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-CHANNEL_NAME = "welcome"
+CHANNEL_ID = 1467477719766794260
+welcome_channel = None
 
-def make_image(member, mode="welcome"):
-    bg = Image.open("background.jpg").convert("RGBA")
-    draw = ImageDraw.Draw(bg)
-
-    response = requests.get(member.display_avatar.url)
-    avatar = Image.open(BytesIO(response.content)).convert("RGBA")
-    avatar = avatar.resize((200, 200))
-
-    mask = Image.new("L", avatar.size, 0)
-    ImageDraw.Draw(mask).ellipse((0, 0, 200, 200), fill=255)
-    avatar.putalpha(mask)
-
-    bg.paste(avatar, (bg.width//2 - 100, 180), avatar)
-
-    font_big = ImageFont.truetype("font.ttf", 48)
-    font_small = ImageFont.truetype("font.ttf", 32)
-
-    name = member.name
-    title = "WELCOME" if mode == "welcome" else "GOODBYE"
-    subtitle = f"{member.guild.name}"
-
-    title_width = draw.textlength(title, font=font_big)
-    name_width = draw.textlength(name, font=font_big)
-
-    draw.text(
-        ((bg.width - title_width)//2, 420),
-        title,
-        font=font_big,
-        fill="#00ff99" if mode == "welcome" else "#ff5555"
-    )
-
-    draw.text(
-        ((bg.width - name_width)//2, 480),
-        name,
-        font=font_big,
-        fill="white"
-    )
-
-    draw.text(
-        (bg.width//2 - 120, 550),
-        subtitle,
-        font=font_small,
-        fill="#cccccc"
-    )
-
-    filename = "welcome.jpg" if mode == "welcome" else "leave.jpg"
-    bg.save(filename)
-    return filename
+@bot.event
+async def on_ready():
+    global welcome_channel
+    try:
+        welcome_channel = await bot.fetch_channel(CHANNEL_ID)
+        print(f"Bot online sebagai {bot.user}")
+        print("Channel welcome ditemukan")
+    except Exception as e:
+        print("Gagal mengambil channel:", e)
 
 @bot.event
 async def on_member_join(member):
-    channel = discord.utils.get(member.guild.text_channels, name=welcome)
-    if channel is None:
+    global welcome_channel
+
+    if welcome_channel is None:
+        try:
+            welcome_channel = await bot.fetch_channel(CHANNEL_ID)
+        except:
+            print("Channel masih tidak ditemukan")
+            return
+
+    if not welcome_channel.permissions_for(member.guild.me).send_messages:
+        print("Bot tidak punya izin kirim pesan")
         return
 
-    image = make_image(member, "welcome")
-
     embed = discord.Embed(
-        title="🎉 Selamat Datang!",
-        description=f"{member.mention} bergabung ke server!",
-        color=0x00ff99
+        title="👋 Selamat Datang!",
+        description=f"Selamat datang {member.mention} di **{member.guild.name}**!",
+        color=discord.Color.green()
     )
-    embed.set_image(url=f"attachment://{image}")
 
-    await channel.send(embed=embed, file=discord.File(image))
+    embed.set_thumbnail(
+        url=member.avatar.url if member.avatar else member.default_avatar.url
+    )
+
+    embed.add_field(
+        name="📌 Member ke-",
+        value=str(member.guild.member_count),
+        inline=True
+    )
+
+    embed.set_footer(text="Selamat bergabung!")
+
+    await welcome_channel.send(embed=embed)
 
 @bot.event
 async def on_member_remove(member):
-    channel = discord.utils.get(member.guild.text_channels, name=CHANNEL_NAME)
-    if channel is None:
-        return
+    global welcome_channel
 
-    image = make_image(member, "leave")
+    if welcome_channel is None:
+        try:
+            welcome_channel = await bot.fetch_channel(CHANNEL_ID)
+        except:
+            return
 
     embed = discord.Embed(
-        title="😢 Selamat Tinggal",
-        description=f"{member.name} keluar dari server.",
-        color=0xff5555
+        title="😢 Member Keluar",
+        description=f"**{member.name}** telah keluar dari server.",
+        color=discord.Color.red()
     )
-    embed.set_image(url=f"attachment://{image}")
 
-    await channel.send(embed=embed, file=discord.File(image))
+    await welcome_channel.send(embed=embed)
 
-bot.run("DISCORD_TOKEN")
-
-
-
+bot.run(os.getenv("TOKEN"))
