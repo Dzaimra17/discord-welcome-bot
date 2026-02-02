@@ -93,5 +93,6 @@ async def on_member_remove(member):
 
     await channel.send(embed=embed, file=discord.File(image))
 
-bot.run("TOKEN")
+bot.run("DISCORD_TOKEN")
+
 
