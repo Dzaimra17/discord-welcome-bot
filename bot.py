@@ -1,107 +1,97 @@
 import discord
 from discord.ext import commands
-import os
-from dotenv import load_dotenv
-
 from PIL import Image, ImageDraw, ImageFont
 import requests
 from io import BytesIO
 
-# =====================
-# LOAD TOKEN
-# =====================
-load_dotenv()
-TOKEN = os.getenv("TOKEN")
-
-# =====================
-# INTENTS
-# =====================
 intents = discord.Intents.default()
 intents.members = True
-
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-@bot.event
-async def on_ready():
-    print(f"Bot online sebagai {bot.user}")
+CHANNEL_NAME = "welcome"
 
-# =====================
-# WELCOME (JOIN)
-# =====================
-@bot.event
-async def on_member_join(member):
-    channel = discord.utils.get(member.guild.text_channels, name="welcome")
-    if not channel:
-        return
+def make_image(member, mode="welcome"):
+    bg = Image.open("background.jpg").convert("RGBA")
+    draw = ImageDraw.Draw(bg)
 
-    # BACKGROUND JPG
-    background = Image.open("background.jpg").convert("RGBA")
-
-    # AVATAR
-    avatar_url = member.avatar.url if member.avatar else member.default_avatar.url
-    avatar_bytes = requests.get(avatar_url).content
-    avatar = Image.open(BytesIO(avatar_bytes)).convert("RGBA")
+    response = requests.get(member.display_avatar.url)
+    avatar = Image.open(BytesIO(response.content)).convert("RGBA")
     avatar = avatar.resize((200, 200))
 
-    # MASK BULAT
-    mask = Image.new("L", (200, 200), 0)
-    draw_mask = ImageDraw.Draw(mask)
-    draw_mask.ellipse((0, 0, 200, 200), fill=255)
+    mask = Image.new("L", avatar.size, 0)
+    ImageDraw.Draw(mask).ellipse((0, 0, 200, 200), fill=255)
+    avatar.putalpha(mask)
 
-    # TEMPEL AVATAR (TENGAH)
-    background.paste(avatar, (412, 120), mask)
+    bg.paste(avatar, (bg.width//2 - 100, 180), avatar)
 
-    # TULIS NAMA
-    draw = ImageDraw.Draw(background)
-    try:
-        font = ImageFont.truetype("arial.ttf", 42)
-    except:
-        font = ImageFont.load_default()
+    font_big = ImageFont.truetype("font.ttf", 48)
+    font_small = ImageFont.truetype("font.ttf", 32)
 
     name = member.name
-    text_width = draw.textlength(name, font=font)
+    title = "WELCOME" if mode == "welcome" else "GOODBYE"
+    subtitle = f"{member.guild.name}"
+
+    title_width = draw.textlength(title, font=font_big)
+    name_width = draw.textlength(name, font=font_big)
 
     draw.text(
-        ((1024 - text_width) / 2, 350),
+        ((bg.width - title_width)//2, 420),
+        title,
+        font=font_big,
+        fill="#00ff99" if mode == "welcome" else "#ff5555"
+    )
+
+    draw.text(
+        ((bg.width - name_width)//2, 480),
         name,
-        font=font,
-        fill=(255, 255, 255)
+        font=font_big,
+        fill="white"
     )
 
-    # SAVE KE MEMORY
-    buffer = BytesIO()
-    background.save(buffer, format="PNG")
-    buffer.seek(0)
-
-    file = discord.File(buffer, filename="welcome.png")
-
-    embed = discord.Embed(
-        title="🎉 Welcome!",
-        description=f"Selamat datang {member.mention} di **{member.guild.name}**",
-        color=discord.Color.green()
+    draw.text(
+        (bg.width//2 - 120, 550),
+        subtitle,
+        font=font_small,
+        fill="#cccccc"
     )
-    embed.set_image(url="attachment://welcome.png")
 
-    await channel.send(embed=embed, file=file)
+    filename = "welcome.png" if mode == "welcome" else "leave.png"
+    bg.save(filename)
+    return filename
 
-# =====================
-# LEAVE
-# =====================
 @bot.event
-async def on_member_remove(member):
-    channel = discord.utils.get(member.guild.text_channels, name="welcome")
-    if not channel:
+async def on_member_join(member):
+    channel = discord.utils.get(member.guild.text_channels, name=CHANNEL_NAME)
+    if channel is None:
         return
 
+    image = make_image(member, "welcome")
+
     embed = discord.Embed(
-        title="👋 Goodbye",
-        description=f"**{member.name}** keluar dari server.",
-        color=discord.Color.red()
+        title="🎉 Selamat Datang!",
+        description=f"{member.mention} bergabung ke server!",
+        color=0x00ff99
     )
+    embed.set_image(url=f"attachment://{image}")
 
-    await channel.send(embed=embed)
+    await channel.send(embed=embed, file=discord.File(image))
 
-# =====================
-# RUN BOT
-# =====================
-bot.run(TOKEN)
+@bot.event
+async def on_member_remove(member):
+    channel = discord.utils.get(member.guild.text_channels, name=CHANNEL_NAME)
+    if channel is None:
+        return
+
+    image = make_image(member, "leave")
+
+    embed = discord.Embed(
+        title="😢 Selamat Tinggal",
+        description=f"{member.name} keluar dari server.",
+        color=0xff5555
+    )
+    embed.set_image(url=f"attachment://{image}")
+
+    await channel.send(embed=embed, file=discord.File(image))
+
+bot.run("TOKEN")
+
