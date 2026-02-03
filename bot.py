@@ -75,10 +75,11 @@ async def on_member_remove(member):
         url=member.avatar.url if member.avatar else member.default_avatar.url
     )
 
-    embed.set_footer(text="Selamat tinggal:(")
+    embed.set_footer(text="NOOOOO 😭")
 
     await welcome_channel.send(embed=embed)
 
 bot.run(os.getenv("TOKEN"))
+
 
 
